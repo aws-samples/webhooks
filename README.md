@@ -1,11 +1,19 @@
-## My Project
+# Webhooks on AWS: Innovate with event notifications
 
-TODO: Fill this README out!
+This repository is intended for developers looking to send or receive webhooks using AWS. It contains code samples for the reference architectures outlined on [Sending and receiving webhooks on AWS: Innovate with event notifications](#todo). This includes:
 
-Be sure to:
+* [send-webhooks/](/send-webhooks/): An application that delivers webhooks to an external endpoint.
+* [receive-webhooks/](/send-webhooks/): An API that receives webhooks with capacity to handle large payloads.
 
-* Change the title in this README
-* Edit your repository description on GitHub
+If you have any comments, suggestions or feedback, we'd love to [hear from you](https://github.com/aws-samples/webhooks/issues/new).
+
+## Architecture: Send Webhooks
+
+![An architecture to send webhooks using Amazon EventBridge Pipes](/send-webhooks/images/architecture-send-webhooks.png)
+
+## Architecture: Receive Webhooks
+
+![An architecture to receive webhooks using the claim-check pattern](/receive-webhooks/images/architecture-receive-webhooks.png)
 
 ## Security
 

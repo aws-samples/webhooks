@@ -1,0 +1,145 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Sample architecture with DynamoDB, EventBridge Pipes, and API Destinations
+
+Parameters:
+    WebhookUrl:
+        Type: String
+        Default: https://webhook.site/37e1931b-30c9-4d31-8336-8ec57b8be177 # Test using webhook.site utility
+    WebhookApiKey:
+        Type: String
+        Default: 'test-api-key' # For illustrative purposes only. In production, this should be secret!
+
+Globals: # https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-specification-template-anatomy-globals.html
+    Function:
+        Timeout: 5
+        MemorySize: 128
+        Runtime: python3.10
+
+Resources:
+    # DynamoDB table as event source
+    DynamoDBTable:
+        Type: AWS::DynamoDB::Table
+        Properties:
+            TableName: PaymentStatusEvents
+            BillingMode: PAY_PER_REQUEST
+            AttributeDefinitions:
+                - AttributeName: paymentId
+                  AttributeType: S
+            KeySchema:
+                - AttributeName: paymentId
+                  KeyType: HASH
+            StreamSpecification:
+                StreamViewType: NEW_AND_OLD_IMAGES
+
+    # DLQ for DDB Stream (Source)
+    SourceDLQ: 
+        Type: AWS::SQS::Queue  
+
+    # IAM Role for Pipe        
+    PipeRole:
+        Type: AWS::IAM::Role
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: 2012-10-17
+                Statement:
+                    - Effect: Allow
+                      Principal:
+                        Service:
+                            - pipes.amazonaws.com
+                      Action:
+                        - sts:AssumeRole
+            Policies:
+                - PolicyName: SourcePolicy
+                  PolicyDocument:
+                    Version: 2012-10-17
+                    Statement:
+                        - Effect: Allow
+                          Action:
+                            - "dynamodb:DescribeStream"
+                            - "dynamodb:GetRecords"
+                            - "dynamodb:GetShardIterator"
+                            - "dynamodb:ListStreams"
+                          Resource: !GetAtt DynamoDBTable.StreamArn
+                - PolicyName: SourceDLQPolicy
+                  PolicyDocument:
+                    Version: 2012-10-17
+                    Statement:
+                        - Effect: Allow
+                          Action:
+                            - 'sqs:GetQueueAttributes'
+                            - 'sqs:SendMessage'
+                          Resource: !GetAtt SourceDLQ.Arn
+                - PolicyName: TargetPolicy
+                  PolicyDocument:
+                    Version: 2012-10-17
+                    Statement:
+                        - Effect: Allow
+                          Action:
+                            - 'events:InvokeApiDestination'
+                          Resource: !GetAtt ApiDestinationWebhookConsumer.Arn
+
+    # EventBridge Pipe              
+    Pipe:
+        Type: AWS::Pipes::Pipe
+        DependsOn:
+            - SourceDLQ
+            - ApiDestinationWebhookConsumer
+            - PipeRole
+        Properties:
+            Name: ddb-to-api-destinations
+            Description: "Pipe to connect DDB stream to EventBridge API Destinations"
+            RoleArn: !GetAtt PipeRole.Arn
+            Source: !GetAtt DynamoDBTable.StreamArn
+            SourceParameters:
+                DynamoDBStreamParameters:
+                    StartingPosition: LATEST
+                    BatchSize: 1
+                    DeadLetterConfig:
+                        Arn: !GetAtt SourceDLQ.Arn
+                FilterCriteria: 
+                    Filters: 
+                        - Pattern: '{"eventName" : ["INSERT", "MODIFY"] }'
+            Target: !GetAtt ApiDestinationWebhookConsumer.Arn
+            TargetParameters:
+                InputTemplate: | 
+                    { 
+                        "specversion": "1.0", 
+                        "id": <$.eventID>,
+                        "type": "payment-status",
+                        "source": "<$.eventSourceARN>", 
+                        "region": "<$.awsRegion>", 
+                        "data": { 
+                            "paymentId": <$.dynamodb.NewImage.paymentId.S>, 
+                            "status": <$.dynamodb.NewImage.status.S>
+                        }
+                    }
+
+
+    WebhookConnection:
+        Type: AWS::Events::Connection
+        Properties:
+            Description: 'Connection with API Key'
+            AuthorizationType: API_KEY
+            AuthParameters:
+                ApiKeyAuthParameters:
+                    ApiKeyName: 'x-api-key'
+                    ApiKeyValue: !Ref WebhookApiKey
+
+    ApiDestinationWebhookConsumer:
+        Type: AWS::Events::ApiDestination
+        DependsOn:
+            - WebhookConnection
+        Properties:
+            Name: 'WebhookConsumerTest'
+            ConnectionArn: !GetAtt WebhookConnection.Arn
+            InvocationEndpoint: !Ref WebhookUrl
+            HttpMethod: POST 
+            InvocationRateLimitPerSecond: 10
+            
+Outputs:
+    DynamoDBTableArn:
+        Description: The ARN of the DynamoDB table for payment status events.
+        Value: !GetAtt DynamoDBTable.Arn
+    ApiDestinationWebhookConsumerArn:
+        Value: !GetAtt ApiDestinationWebhookConsumer.Arn
