@@ -6,7 +6,7 @@ An example event-driven application which sends webhooks using [Amazon EventBrid
 
 The application takes the [change data capture event for DynamoDB streams](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.html) and uses [EventBridge Pipes](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-pipes.html) and [API destinations](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-api-destinations.html) to send the event to an external endpoint.
 
-![Reference Architecture](images/reference-architecture.png)
+![Reference Architecture](images/architecture-send-webhooks.png)
 
 ## Pre-Requisites
 
