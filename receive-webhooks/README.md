@@ -40,7 +40,7 @@ You can extend the solution using [Amazon EventBridge Pipes](https://docs.aws.am
 sam deploy --guided
 ```
 
-2. Test sending webhooks using the tool of your choice such as Postman or cURL, or use one of the pre-built providers on [/receive-webhooks/src/webhook/app/providers/](/src/webhook/app/providers/) such as Plaid or Stripe.
+2. Test sending webhooks using the tool of your choice such as Postman or cURL, or use one of the pre-built providers on [src/webhook/app/providers/](/receive-webhooks/src/webhook/app/providers/) such as Plaid or Stripe.
 
 If you have a provider that you'd love to see, we'd love to [hear from you](https://github.com/aws-samples/webhooks/issues/new).
 
