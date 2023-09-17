@@ -37,6 +37,14 @@ aws dynamodb put-item \
 
 3. The webhook will subsequently be delivered to the endpoint specified. You can use tools such as [webhook.site](https://webhook.site/) for prototyping such as in the code example: [https://webhook.site/37e1931b-30c9-4d31-8336-8ec57b8be177](https://webhook.site/37e1931b-30c9-4d31-8336-8ec57b8be177)
 
+## Clean up
+
+To avoid unnecessary costs, clean up after using the solution.
+
+```
+sam delete
+```
+
 ### Notes
 
 * For illustrative purposes only, we use `API_KEY` (instead of `OAUTH_CLIENT_CREDENTIALS`) as the `AuthorizationType` for the API Destinations [Connection](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-events-connection.html). If you would like to use OAuth, you will need to specify an endpoint with OAuth.

@@ -1,0 +1,352 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: "AWS::Serverless-2016-10-31"
+Description: Sample architecture to receive webhooks
+
+Parameters:
+  BasicAuthUser:
+    Type: String
+    Description: Basic Authentication user name
+    Default: ""
+    NoEcho: true
+  BasicAuthPassword:
+    Type: String
+    Description: Basic Authentication password
+    Default: ""
+    NoEcho: true
+  WebhookSecret:
+    Type: String
+    Description: Webhook Secret
+    NoEcho: true
+  BucketPrefix:
+    Type: String
+    Description: S3 Bucket Prefix
+    Default: "raw/"
+
+Globals:
+  Function:
+    Architectures:
+      - arm64
+    Environment:
+      Variables:
+        LOG_LEVEL: info
+    Handler: app.lambda_handler.handler
+    Layers:
+      - !FindInMap [RegionMap, !Ref "AWS::Region", PowertoolsArn]
+    MemorySize: 128 # megabytes
+    Runtime: python3.11
+    Timeout: 5 # seconds
+    Tracing: Active
+
+Mappings:
+  RegionMap:
+    "us-east-1":
+      # @see https://docs.powertools.aws.dev/lambda/python/latest/#lambda-layer
+      PowertoolsArn: "arn:aws:lambda:us-east-1:017000801446:layer:AWSLambdaPowertoolsPythonV2-Arm64:43"
+
+Resources:
+  DependencyLayer:
+    Type: "AWS::Serverless::LayerVersion"
+    Metadata:
+      BuildMethod: python3.11
+      BuildArchitecture: arm64
+    Properties:
+      LicenseInfo: MIT-0
+      CompatibleArchitectures:
+        - arm64
+      CompatibleRuntimes:
+        - python3.11
+      ContentUri: src/dependencies
+      Description: !Sub "${AWS::StackName} - Dependency Layer"
+      RetentionPolicy: Delete
+
+  EncryptionKey:
+    Type: "AWS::KMS::Key"
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Properties:
+      Description: !Sub "${AWS::StackName} - Encryption Key"
+      Enabled: true
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
+            Action: "kms:*"
+            Resource: "*"
+          - Sid: Allow encryption by webhoook function
+            Effect: Allow
+            Principal:
+              AWS: !GetAtt WebhookFunctionRole.Arn
+            Action:
+              - "kms:DescribeKey"
+              - "kms:Encrypt"
+              - "kms:GenerateDataKey"
+            Resource: "*"
+      KeySpec: SYMMETRIC_DEFAULT
+      KeyUsage: ENCRYPT_DECRYPT
+      MultiRegion: false
+      PendingWindowInDays: 7
+
+  EncryptionAlias:
+    Type: "AWS::KMS::Alias"
+    Properties:
+      AliasName: !Sub "alias/${AWS::StackName}"
+      TargetKeyId: !Ref EncryptionKey
+
+  WebhookParameter:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Description: Webhook Credential
+      Name: "/webhook/credentials"
+      Type: String
+      Value: !Sub |-
+        {
+          "basic_auth_user": "${BasicAuthUser}",
+          "basic_auth_password": "${BasicAuthPassword}",
+          "webhook_secret": "${WebhookSecret}"
+        }
+
+  Table:
+    Type: "AWS::DynamoDB::GlobalTable"
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: gsi1pk
+          AttributeType: S
+        - AttributeName: gsi1sk
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: gsi1
+          KeySchema:
+            - AttributeName: gsi1pk
+              KeyType: HASH
+            - AttributeName: gsi1sk
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Replicas:
+        - PointInTimeRecoverySpecification:
+            PointInTimeRecoveryEnabled: true
+          Region: !Ref "AWS::Region"
+          TableClass: STANDARD
+      SSESpecification:
+        SSEEnabled: true
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      TimeToLiveSpecification:
+        AttributeName: expire_at
+        Enabled: true
+
+  HttpApi:
+    Type: "AWS::Serverless::HttpApi"
+    Properties:
+      CorsConfiguration:
+        AllowHeaders:
+          - "*"
+        AllowMethods:
+          - POST
+        AllowOrigins:
+          - "*"
+      Description: !Sub "${AWS::StackName} - Webhook API"
+      Name: webhook
+      DisableExecuteApiEndpoint: false
+
+  WebhookFunctionLogGroup:
+    Type: "AWS::Logs::LogGroup"
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W84
+            reason: "Ignoring KMS key"
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${WebhookFunction}"
+      RetentionInDays: 3
+      Tags:
+        - Key: "aws-cloudformation:stack-name"
+          Value: !Ref "AWS::StackName"
+        - Key: "aws-cloudformation:stack-id"
+          Value: !Ref "AWS::StackId"
+        - Key: "aws-cloudformation:logical-id"
+          Value: WebhookFunctionLogGroup
+
+  WebhookFunctionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: !Sub "lambda.${AWS::URLSuffix}"
+          Action: "sts:AssumeRole"
+      Description: !Sub "DO NOT DELETE - Used by Lambda. Created by CloudFormation ${AWS::StackId}"
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AWSXRayDaemonWriteAccess"
+      Tags:
+        - Key: "aws-cloudformation:stack-name"
+          Value: !Ref "AWS::StackName"
+        - Key: "aws-cloudformation:stack-id"
+          Value: !Ref "AWS::StackId"
+        - Key: "aws-cloudformation:logical-id"
+          Value: WebhookFunctionRole
+
+  WebhookFunctionPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: WebhookFunctionPolicy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: "s3:PutObject"
+            Resource: !Sub "${Bucket.Arn}/${BucketPrefix}*"
+          - Effect: Allow
+            Action:
+              - "kms:DescribeKey"
+              - "kms:Encrypt"
+              - "kms:GenerateDataKey"
+            Resource: !GetAtt EncryptionKey.Arn
+          - Effect: Allow
+            Action:
+              - "dynamodb:GetItem"
+              - "dynamodb:PutItem"
+            Resource: !GetAtt Table.Arn
+          - Effect: Allow
+            Action: "ssm:GetParameter"
+            Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${WebhookParameter}"
+      Roles:
+        - !Ref WebhookFunctionRole
+
+  CloudWatchLogsPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: CloudWatchLogs
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+            Resource: !GetAtt WebhookFunctionLogGroup.Arn
+      Roles:
+        - !Ref WebhookFunctionRole
+
+  WebhookFunction:
+    Type: "AWS::Serverless::Function"
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W58
+            reason: "Ignoring CloudWatch"
+          - id: W89
+            reason: "Ignoring VPC"
+          - id: W92
+            reason: "Ignoring Reserved Concurrency"
+    Properties:
+      CodeUri: src/webhook
+      Description: !Sub "${AWS::StackName} - Webhook Function"
+      Events:
+        HttpApiEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref Bucket
+          BUCKET_OWNER_ID: !Ref "AWS::AccountId"
+          BUCKET_PREFIX: !Ref BucketPrefix
+          TABLE_NAME: !Ref Table
+          KMS_KEY_ID: !Ref EncryptionKey
+          SSM_PARAMETER: !Ref WebhookParameter
+      Layers:
+        - !Ref DependencyLayer
+      Role: !GetAtt WebhookFunctionRole.Arn
+
+  Bucket:
+    Type: "AWS::S3::Bucket"
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W35
+            reason: "Ignoring access logging"
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              KMSMasterKeyID: !GetAtt EncryptionKey.Arn
+              SSEAlgorithm: "aws:kms"
+      LifecycleConfiguration:
+        Rules:
+          - ExpirationInDays: 3
+            Id: RetentionRule
+            Status: Enabled
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+
+  BucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Ref Bucket
+      PolicyDocument:
+        Statement:
+          - Sid: AllowSSLRequestsOnly
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !Sub "${Bucket.Arn}/*"
+              - !GetAtt Bucket.Arn
+            Condition:
+              Bool:
+                "aws:SecureTransport": false
+          - Sid: DenyUnEncryptedObjectUploads
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:PutObject"
+            Resource: !Sub "${Bucket.Arn}/*"
+            Condition:
+              StringNotEquals:
+                "s3:x-amz-server-side-encryption": "aws:kms"
+    
+Outputs:
+  WebhookUrl:
+    Description: Webhook API URL
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/"
+  KmsKeyArn:
+    Description: KMS Key ARN
+    Value: !GetAtt EncryptionKey.Arn
+  BucketName:
+    Description: S3 Bucket Name
+    Value: !Ref Bucket
+  BucketArn:
+    Description: S3 Bucket ARN
+    Value: !GetAtt Bucket.Arn

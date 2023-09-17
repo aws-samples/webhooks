@@ -1,0 +1,5 @@
+wheel==0.41.1
+black==23.9.1
+aws-lambda-powertools[all,aws-sdk]==2.24.0
+mypy-boto3-s3==1.28.36
+mypy-boto3-dynamodb==1.28.36

@@ -1,0 +1,4 @@
+lithic==0.18.3
+python-jose[cryptography]==3.3.0
+stripe==6.4.0
+requests==2.31.0
