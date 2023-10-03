@@ -31,10 +31,27 @@ Resources:
                   KeyType: HASH
             StreamSpecification:
                 StreamViewType: NEW_AND_OLD_IMAGES
+            PointInTimeRecoverySpecification:
+                PointInTimeRecoveryEnabled: true
+            SSEEnabled: false # Use an AWS-owned key for server-side encryption
+        Metadata:
+            cfn_nag:
+                rules_to_suppress:
+                    - id: W74
+                      reason: "Ignoring KMS key"
+                    - id: W28
+                      reason: "Explicit name"
 
     # DLQ for DDB Stream (Source)
     SourceDLQ: 
         Type: AWS::SQS::Queue  
+        Properties:
+            SqsManagedSseEnabled: true
+        Metadata:
+            cfn_nag:
+                rules_to_suppress:
+                    - id: W48
+                      reason: "Ignoring KMS key"
 
     # IAM Role for Pipe        
     PipeRole:
