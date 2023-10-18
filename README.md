@@ -1,6 +1,6 @@
 # Webhooks on AWS: Innovate with event notifications
 
-This repository is intended for developers looking to send or receive webhooks using AWS. It contains code samples for the reference architectures outlined on [Sending and receiving webhooks on AWS: Innovate with event notifications](#todo). This includes:
+This repository is intended for developers looking to send or receive webhooks using AWS. It contains code samples for the reference architectures outlined on [Sending and receiving webhooks on AWS: Innovate with event notifications](https://aws.amazon.com/blogs/compute/sending-and-receiving-webhooks-on-aws-innovate-with-event-notifications/). This includes:
 
 * [send-webhooks/](/send-webhooks/): An application that delivers webhooks to an external endpoint.
 * [receive-webhooks/](/receive-webhooks/): An API that receives webhooks with capacity to handle large payloads.
