@@ -33,7 +33,7 @@ Globals:
     Layers:
       - !FindInMap [RegionMap, !Ref "AWS::Region", PowertoolsArn]
     MemorySize: 128 # megabytes
-    Runtime: python3.11
+    Runtime: python3.12
     Timeout: 5 # seconds
     Tracing: Active
 
@@ -41,20 +41,20 @@ Mappings:
   RegionMap:
     "us-east-1":
       # @see https://docs.powertools.aws.dev/lambda/python/latest/#lambda-layer
-      PowertoolsArn: "arn:aws:lambda:us-east-1:017000801446:layer:AWSLambdaPowertoolsPythonV2-Arm64:43"
+      PowertoolsArn: "arn:aws:lambda:us-east-1:017000801446:layer:AWSLambdaPowertoolsPythonV2-Arm64:60"
 
 Resources:
   DependencyLayer:
     Type: "AWS::Serverless::LayerVersion"
     Metadata:
-      BuildMethod: python3.11
+      BuildMethod: python3.12
       BuildArchitecture: arm64
     Properties:
       LicenseInfo: MIT-0
       CompatibleArchitectures:
         - arm64
       CompatibleRuntimes:
-        - python3.11
+        - python3.12
       ContentUri: src/dependencies
       Description: !Sub "${AWS::StackName} - Dependency Layer"
       RetentionPolicy: Delete
@@ -216,6 +216,9 @@ Resources:
           - Effect: Allow
             Action: "s3:PutObject"
             Resource: !Sub "${Bucket.Arn}/${BucketPrefix}*"
+            Condition:
+              ArnEquals:
+                "lambda:SourceFunctionArn": !GetAtt WebhookFunction.Arn
           - Effect: Allow
             Action:
               - "kms:DescribeKey"
