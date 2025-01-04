@@ -28,7 +28,6 @@ from .lithic import LithicProvider
 from .marqeta import MarqetaProvider
 from .solidfi import SolidProvider
 from .stripe import StripeProvider
-from .synapse import SynapseProvider
 from .treasury_prime import TreasuryPrimeProvider
 from .trolley import TrolleyProvider
 from .unit import UnitProvider
@@ -40,7 +39,6 @@ ALL_PROVIDERS: List[BaseProvider] = [
     MarqetaProvider,
     SolidProvider,
     StripeProvider,
-    SynapseProvider,
     TreasuryPrimeProvider,
     TrolleyProvider,
     UnitProvider,

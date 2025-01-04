@@ -31,30 +31,24 @@ Globals:
         LOG_LEVEL: info
     Handler: app.lambda_handler.handler
     Layers:
-      - !FindInMap [RegionMap, !Ref "AWS::Region", PowertoolsArn]
+      - "{{resolve:ssm:/aws/service/powertools/python/arm64/python3.13/latest}}"
     MemorySize: 128 # megabytes
-    Runtime: python3.12
+    Runtime: python3.13
     Timeout: 5 # seconds
     Tracing: Active
-
-Mappings:
-  RegionMap:
-    "us-east-1":
-      # @see https://docs.powertools.aws.dev/lambda/python/latest/#lambda-layer
-      PowertoolsArn: "arn:aws:lambda:us-east-1:017000801446:layer:AWSLambdaPowertoolsPythonV2-Arm64:60"
 
 Resources:
   DependencyLayer:
     Type: "AWS::Serverless::LayerVersion"
     Metadata:
-      BuildMethod: python3.12
+      BuildMethod: python3.13
       BuildArchitecture: arm64
     Properties:
       LicenseInfo: MIT-0
       CompatibleArchitectures:
         - arm64
       CompatibleRuntimes:
-        - python3.12
+        - python3.13
       ContentUri: src/dependencies
       Description: !Sub "${AWS::StackName} - Dependency Layer"
       RetentionPolicy: Delete
@@ -299,7 +293,13 @@ Resources:
       LifecycleConfiguration:
         Rules:
           - ExpirationInDays: 3
-            Id: RetentionRule
+            Id: ExpireAfter3Days
+            Status: Enabled
+          - AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+            Id: ExpireNonCurrentAndIncompleteMultipartUpload
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 1
             Status: Enabled
       NotificationConfiguration:
         EventBridgeConfiguration:
