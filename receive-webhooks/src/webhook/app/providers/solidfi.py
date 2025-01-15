@@ -26,7 +26,6 @@ from app.providers.base import BaseProvider
 __all__ = ["SolidProvider"]
 
 
-# @see https://www.solidfi.com/docs/introduction-to-webhooks
 class SolidProvider(BaseProvider):
     SIGNATURE_HEADER = "sd-webhook-sha256-signature"
     SIGNATURE_ALGO = "sha256"

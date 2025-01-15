@@ -2,7 +2,7 @@
 
 setup:
 	python3 -m venv .venv
-	.venv/bin/python3 -m pip install -U pip
+	.venv/bin/python3 -m pip install -U pip wheel
 	.venv/bin/python3 -m pip install -r requirements-dev.txt
 	.venv/bin/python3 -m pip install -r src/dependencies/requirements.txt
 	.venv/bin/python3 -m pip install -r src/webhook/requirements.txt
