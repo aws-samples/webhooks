@@ -24,6 +24,7 @@ from typing import List
 from .base import BaseProvider
 from .column import ColumnProvider
 from .dwolla import DwollaProvider
+from .github import GithubProvider
 from .lithic import LithicProvider
 from .marqeta import MarqetaProvider
 from .solidfi import SolidProvider
@@ -35,6 +36,7 @@ from .unit import UnitProvider
 ALL_PROVIDERS: List[BaseProvider] = [
     ColumnProvider,
     DwollaProvider,
+    GithubProvider,
     LithicProvider,
     MarqetaProvider,
     SolidProvider,

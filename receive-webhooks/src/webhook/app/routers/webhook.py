@@ -24,7 +24,7 @@ import math
 
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.event_handler.api_gateway import Router, Response
-from aws_lambda_powertools.event_handler.exceptions import InternalServerError, BadRequestError
+from aws_lambda_powertools.event_handler.exceptions import InternalServerError, BadRequestError, UnauthorizedError
 import boto3
 
 from app import providers, exceptions, constants, resources
@@ -57,6 +57,8 @@ def post_webhook(provider: str) -> Response:
 
     prov: providers.BaseProvider = provider_class(event)
     logger.debug(f"Using provider: {prov.get_provider_name()}")
+    if not prov.verify():
+        raise UnauthorizedError("Signature verification failed")
 
     event_id = prov.get_event_id()
     if prov.is_duplicate(event_id):
