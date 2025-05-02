@@ -66,7 +66,7 @@ class BaseProvider:
         if not self.SIGNATURE_HEADER or not self.SIGNATURE_ALGO:
             raise NotImplementedError
 
-        signature = self._event.get_header_value(self.SIGNATURE_HEADER)
+        signature = self.parse_signature(self._event.get_header_value(self.SIGNATURE_HEADER))
         if not signature:
             logger.warning(f"Signature header {self.SIGNATURE_HEADER} not found")
             return False
@@ -142,3 +142,6 @@ class BaseProvider:
             return None
 
         return HTTPBasicCredentials(username, password)
+
+    def parse_signature(self, signature: Optional[str]) -> Optional[str]:
+        return signature
