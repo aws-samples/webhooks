@@ -144,17 +144,4 @@ class BaseProvider:
         return HTTPBasicCredentials(username, password)
 
     def parse_signature(self, signature: Optional[str]) -> Optional[str]:
-        """
-        Parse the provided signature string.
-
-        This method is intended to be overridden by subclasses to implement
-        custom signature parsing logic, if required. By default, it returns
-        the input signature unchanged.
-
-        Args:
-            signature (Optional[str]): The signature string to parse.
-
-        Returns:
-            Optional[str]: The parsed signature, or None if the input is None.
-        """
         return signature
