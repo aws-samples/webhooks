@@ -75,15 +75,16 @@ class BaseProvider:
         if not payload:
             logger.warning("Missing payload body")
             return False
+        payload_bytes = payload.encode()
 
         parameter = self.get_parameter()
         key = bytes(parameter[self.PARAMETER_KEY], "utf-8")
 
         if self.SIGNATURE_ENCODING == "base64":
-            computed_signature = hmac.new(key, payload, self.SIGNATURE_ALGO).digest()
+            computed_signature = hmac.new(key, payload_bytes, self.SIGNATURE_ALGO).digest()
             computed_signature = base64.encodebytes(computed_signature).decode().rstrip()
         else:
-            computed_signature = hmac.new(key, payload, self.SIGNATURE_ALGO).hexdigest()
+            computed_signature = hmac.new(key, payload_bytes, self.SIGNATURE_ALGO).hexdigest()
 
         if not hmac.compare_digest(signature, computed_signature):
             logger.warning(
